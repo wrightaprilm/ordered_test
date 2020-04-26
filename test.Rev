@@ -1,0 +1,63 @@
+## ----global_options, eval = TRUE, include=TRUE---------------------------
+name = "mk_o"
+
+morpho <- readDiscreteCharacterData("Cinctans_for_RevBayes.nex")
+
+
+## ---- include=TRUE, eval = TRUE------------------------------------------
+    taxa <- morpho.names()
+    num_taxa <- morpho.size()
+    num_branches <- 2 * num_taxa - 2
+
+
+## ---- include=TRUE, eval = TRUE------------------------------------------
+    mvi = 1
+    mni = 1
+
+
+## ---- include=TRUE, eval = TRUE------------------------------------------
+    br_len_lambda ~ dnExp(0.2)
+    moves[mvi++] = mvScale(br_len_lambda, weight=2)
+
+
+
+## ---- include=TRUE, eval = TRUE------------------------------------------
+
+    phylogeny ~ dnUniformTopologyBranchLength(taxa, branchLengthDistribution=dnExponential(br_len_lambda))
+    moves[mvi++] = mvNNI(phylogeny, weight=num_branches/2.0)
+    moves[mvi++] = mvSPR(phylogeny, weight=num_branches/10.0)
+    moves[mvi++] = mvBranchLengthScale(phylogeny, weight=num_branches)
+    tree_length := phylogeny.treeLength()
+
+
+## ---- include=TRUE, eval = TRUE------------------------------------------
+    alpha_morpho ~ dnUniform( 0, 1E6 )
+    rates_morpho := fnDiscretizeGamma( alpha_morpho, alpha_morpho, 4 )
+    #Moves on the parameters to the Gamma distribution.
+    moves[mvi++] = mvScale(alpha_morpho, lambda=1, weight=2.0)
+
+morpho.setNumStatesPartition(4)
+
+q_O <- fnOrderedRateMatrix(maxState = 4, lambda = 3, mu=1)
+q_O
+q_O.getTransitionProbabilities(rate=.1)
+
+mu=1
+lambda = 3
+
+q_f <- fnFreeK([ [  0.0, lambda,    0.0,    0.0],
+                [   mu,    0.0, lambda,    0.0],
+                [  0.0,     mu,    0.0, lambda],
+                [  0.0,    0.0,     mu,    0.0] ], matrixExponentialMethod = "scalingAndSquaring")
+
+q_f
+q_f.getTransitionProbabilities(rate=.1)
+
+nc=2
+m_morph ~ dnPhyloCTMC( tree=phylogeny,
+                            Q=q_O,
+                            nSites=nc,
+                            siteRates=rates_morpho,
+                            type="Standard")
+
+  m_morph.clamp(morpho)
